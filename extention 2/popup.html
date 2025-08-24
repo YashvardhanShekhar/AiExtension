@@ -1,0 +1,434 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <title>Voice Assistant</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <style>
+    :root{
+      --accent:#4285f4;
+      --accent-2:#34a853;
+      --text:#202124;
+      --muted:#5f6368;
+      --user:#e8f0fe;
+      --bot:#ffffff;
+      --border:rgba(0,0,0,0.12);
+      --shadow:rgba(0,0,0,0.1);
+      --glass:rgba(255,255,255,0.95);
+    }
+    
+    *{box-sizing:border-box;}
+    
+    html,body{
+      margin:0; padding:0; height:100vh; width:100vw;
+      background: linear-gradient(135deg, #f0f4ff 0%, #e8f5e8 100%);
+      font-family: system-ui, -apple-system, Arial, sans-serif;
+      color:var(--text);
+      overflow:hidden;
+    }
+    
+    .assistant-shell{
+      display:flex; 
+      flex-direction:column; 
+      height:100vh;
+      background: transparent;
+      position:relative;
+    }
+    
+    .header{
+      position:absolute; 
+      top:40px; 
+      left:50%;
+      transform:translateX(-50%);
+      display:flex; 
+      align-items:center; 
+      gap:12px;
+      padding:16px 24px;
+      background:white;
+      border-radius:32px;
+      box-shadow:0 4px 20px var(--shadow);
+      border:1px solid var(--border);
+      z-index:10;
+    }
+    
+    .logo{
+      width:32px; 
+      height:32px; 
+      border-radius:50%;
+      background: linear-gradient(45deg, var(--accent), var(--accent-2));
+      display:flex; 
+      align-items:center; 
+      justify-content:center;
+      color:white; 
+      font-weight:700; 
+      font-size:14px;
+    }
+    
+    .title{ 
+      font-weight:500; 
+      font-size:18px; 
+      color:var(--text);
+      margin:0;
+    }
+    
+    .badge{
+      font-size:12px; 
+      padding:6px 12px;
+      background:rgba(66,133,244,0.1);
+      color:var(--accent);
+      border-radius:16px;
+      font-weight:500;
+    }
+    
+    .chat-container{
+      flex:1; 
+      display:flex; 
+      flex-direction:column;
+      align-items:center; 
+      justify-content:center;
+      padding:120px 40px 140px;
+      position:relative;
+    }
+    
+    .chat{
+      width:100%; 
+      max-width:680px;
+      max-height:60vh; 
+      overflow-y:auto;
+      display:flex; 
+      flex-direction:column; 
+      gap:16px;
+      padding:20px;
+      background:white;
+      border-radius:24px;
+      box-shadow:0 4px 20px var(--shadow);
+      border:1px solid var(--border);
+      scroll-behavior:smooth;
+    }
+    
+    .welcome{
+      text-align:center; 
+      padding:40px 20px;
+      color:var(--muted);
+      display:block; /* Force visible */
+    }
+    
+    .welcome h2{
+      font-size:28px; 
+      font-weight:400; 
+      margin:0 0 12px;
+      color:var(--accent);
+    }
+    
+    .welcome p{
+      font-size:16px; 
+      margin:0; 
+      opacity:0.8;
+    }
+    
+    .msg{ 
+      display:flex; 
+      gap:12px; 
+      align-items:flex-start;
+    }
+    
+    .msg.user{ 
+      justify-content:flex-end; 
+      flex-direction:row-reverse;
+    }
+    
+    .avatar{
+      width:36px; 
+      height:36px; 
+      border-radius:50%;
+      display:flex; 
+      align-items:center; 
+      justify-content:center;
+      font-size:16px; 
+      font-weight:600; 
+      flex-shrink:0;
+    }
+    
+    .user .avatar{
+      background: linear-gradient(45deg, var(--accent), var(--accent-2));
+      color:white;
+    }
+    
+    .bot .avatar{
+      background:var(--glass);
+      border:2px solid var(--border);
+      color:var(--accent);
+    }
+    
+    .bubble{
+      max-width:70%; 
+      padding:16px 20px;
+      border-radius:20px;
+      background:var(--bot);
+      box-shadow:0 2px 8px rgba(0,0,0,0.1);
+      border:1px solid var(--border);
+      word-wrap:break-word; 
+      white-space:pre-wrap;
+      font-size:15px; 
+      line-height:1.4;
+    }
+    
+    .user .bubble{
+      background:var(--user);
+      border-color:rgba(66,133,244,0.2);
+    }
+    
+    .input-container{
+      position:fixed; 
+      bottom:40px; 
+      left:50%;
+      transform:translateX(-50%);
+      width:100%; 
+      max-width:680px; 
+      padding:0 40px;
+    }
+    
+    .input-shell{
+      display:flex; 
+      gap:12px; 
+      align-items:flex-end;
+      background:white;
+      border-radius:32px;
+      padding:8px;
+      box-shadow:0 4px 20px var(--shadow);
+      border:1px solid var(--border);
+    }
+    
+    .input{ 
+      flex:1; 
+      position:relative;
+    }
+    
+    .input textarea{
+      width:100%; 
+      min-height:48px; 
+      max-height:120px;
+      background:transparent; 
+      color:var(--text);
+      border:0; 
+      padding:12px 50px 12px 20px;
+      outline:none; 
+      resize:none;
+      font-size:16px; 
+      line-height:1.4;
+      font-family:inherit;
+    }
+    
+    .input textarea::placeholder{
+      color:var(--muted);
+    }
+    
+    .mic-btn, .send{
+      width:48px; 
+      height:48px; 
+      border-radius:50%;
+      border:0; 
+      cursor:pointer;
+      display:flex; 
+      align-items:center; 
+      justify-content:center;
+      font-size:20px; 
+      transition:all 0.2s ease;
+    }
+    
+    .mic-btn{
+      background:linear-gradient(45deg, var(--accent), var(--accent-2));
+      color:white;
+      box-shadow:0 2px 8px rgba(66,133,244,0.3);
+    }
+    
+    .mic-btn:hover{
+      transform:scale(1.05);
+    }
+    
+    .send{
+      background:var(--accent);
+      color:white;
+      opacity:0.5;
+      pointer-events:none;
+    }
+    
+    .send.active{
+      opacity:1;
+      pointer-events:auto;
+    }
+    
+    .suggestions{
+      display:flex; 
+      gap:12px; 
+      justify-content:center;
+      margin-top:24px; 
+      flex-wrap:wrap;
+    }
+    
+    .suggestion{
+      padding:12px 20px; 
+      background:rgba(66,133,244,0.1);
+      border:1px solid rgba(66,133,244,0.2);
+      border-radius:20px; 
+      cursor:pointer;
+      font-size:14px; 
+      color:var(--accent);
+      transition:all 0.2s ease;
+    }
+    
+    .suggestion:hover{
+      background:var(--user);
+      transform:translateY(-1px);
+    }
+    
+    .listening{
+      position:fixed; 
+      top:50%; 
+      left:50%;
+      transform:translate(-50%, -50%);
+      background:white;
+      padding:32px;
+      border-radius:24px;
+      text-align:center;
+      box-shadow:0 8px 32px var(--shadow);
+      border:1px solid var(--border);
+      display:none;
+      z-index:100;
+    }
+    
+    .listening.active{
+      display:block;
+    }
+    
+    .pulse{
+      width:80px; 
+      height:80px; 
+      border-radius:50%;
+      background: linear-gradient(45deg, var(--accent), var(--accent-2));
+      margin:0 auto 16px;
+      display:flex; 
+      align-items:center; 
+      justify-content:center;
+      color:white; 
+      font-size:32px;
+      animation: pulse 2s infinite;
+    }
+    
+    @keyframes pulse{ 
+      0%, 100%{transform:scale(1)} 
+      50%{transform:scale(1.1)} 
+    }
+  </style>
+</head>
+<body>
+  <div class="assistant-shell">
+    <div class="header">
+      <div class="logo">🎤</div>
+      <h1 class="title">Voice Assistant</h1>
+      <div class="badge">Active</div>
+    </div>
+
+    <div class="chat-container">
+      <div id="chat" class="chat">
+        <div class="welcome">
+          <h2>Hi, how can I help?</h2>
+          <p>Try saying "Reply to Sam's email" or "Send a message to John"</p>
+          
+          <div class="suggestions">
+            <div class="suggestion" onclick="fillPrompt('Reply to Sam declining the meeting')">Reply to Sam</div>
+            <div class="suggestion" onclick="fillPrompt('Send message to John')">Message John</div>
+            <div class="suggestion" onclick="fillPrompt('Play music on YouTube')">Play music</div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="input-container">
+      <div class="input-shell">
+        <button id="mic" class="mic-btn">🎤</button>
+        <div class="input">
+          <textarea id="prompt" placeholder="Ask me anything..." rows="1"></textarea>
+        </div>
+        <button id="send" class="send">→</button>
+      </div>
+    </div>
+
+    <div id="listening" class="listening">
+      <div class="pulse">🎤</div>
+      <p>Listening...</p>
+    </div>
+  </div>
+
+  <script>
+    console.log('Voice Assistant loaded');
+    
+    // Auto-resize textarea
+    const promptArea = document.getElementById('prompt');
+    promptArea.addEventListener('input', function() {
+      this.style.height = 'auto';
+      this.style.height = this.scrollHeight + 'px';
+      
+      const sendBtn = document.getElementById('send');
+      if(this.value.trim()) {
+        sendBtn.classList.add('active');
+      } else {
+        sendBtn.classList.remove('active');
+      }
+    });
+
+    // Fill prompt from suggestions
+    function fillPrompt(text) {
+      promptArea.value = text;
+      document.getElementById('send').classList.add('active');
+      
+      // Add user message to chat
+      const chat = document.getElementById('chat');
+      const welcome = document.querySelector('.welcome');
+      if(welcome) welcome.style.display = 'none';
+      
+      const msg = document.createElement('div');
+      msg.className = 'msg user';
+      msg.innerHTML = `
+        <div class="avatar">U</div>
+        <div class="bubble">${text}</div>
+      `;
+      chat.appendChild(msg);
+      
+      // Clear input
+      promptArea.value = '';
+      document.getElementById('send').classList.remove('active');
+    }
+
+    // Mock voice listening
+    document.getElementById('mic').addEventListener('click', function() {
+      const listening = document.getElementById('listening');
+      listening.classList.add('active');
+      
+      setTimeout(() => {
+        listening.classList.remove('active');
+        fillPrompt('What can you help me with?');
+      }, 2000);
+    });
+
+    // Send button
+    document.getElementById('send').addEventListener('click', function() {
+      const text = promptArea.value.trim();
+      if(text) {
+        fillPrompt(text);
+      }
+    });
+
+    // Enter to send
+    promptArea.addEventListener('keydown', function(e) {
+      if(e.key === 'Enter' && !e.shiftKey) {
+        e.preventDefault();
+        const text = this.value.trim();
+        if(text) {
+          fillPrompt(text);
+        }
+      }
+    });
+  </script>
+</body>
+</html>
