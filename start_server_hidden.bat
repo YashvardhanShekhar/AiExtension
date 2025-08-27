@@ -1,1 +1,0 @@
-pythonw C:\Projects\extention\server.py

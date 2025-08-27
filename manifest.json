@@ -3,7 +3,8 @@
 	"name": "AI Automation Assistant",
 	"version": "2.0",
 	"description": "AI-powered web automation with full page context",
-	"permissions": ["tabs", "scripting", "activeTab"],
+	"permissions": ["tabs", "scripting", "activeTab", "storage"],
+	"optional_permissions": ["unlimitedStorage"],
 	"host_permissions": ["http://127.0.0.1:5000/*", "<all_urls>"],
 	"background": {
 		"service_worker": "background.js"

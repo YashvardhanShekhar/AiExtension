@@ -1,7 +1,10 @@
-// popup.js - Complete Native Chrome Extension Automation Assistant with Multi-Step Workflows
-const GEMINI_API_KEY = "AIzaSyCX5MikS43fqeQjW6Y9U6UwF4pZZX48sw8";
+// popup.js - Complete Native Chrome Extension Automation Assistant with Multi-Step Workflows and Persistent Chat History
+const GEMINI_API_KEY = "AIzaSyCU3fraYxa-1umgQeDWHyzfS-_FlaElimI";
 const MODEL_ID = "models/gemini-2.5-flash";
 const BASE_URL = "https://generativelanguage.googleapis.com/v1beta";
+
+// Storage key for persistent chat history
+const STORAGE_KEY = "chatHistory_v1";
 
 // Chat history to maintain conversation context
 let chatHistory = [];
@@ -12,6 +15,62 @@ const els = {
 	send: document.getElementById("send"),
 	spinner: document.getElementById("spinner"),
 };
+
+// Storage Functions for Persistence
+async function loadHistory() {
+	try {
+		const { [STORAGE_KEY]: saved } = await chrome.storage.local.get(
+			STORAGE_KEY
+		);
+		if (Array.isArray(saved) && saved.length > 0) {
+			chatHistory = saved;
+			renderHistoryUI(saved);
+		} else {
+			// Show welcome message if no history
+			addMessage(
+				"bot",
+				`🤖 **Multi-Step Automation Assistant Ready!**
+
+I can automate complex workflows with sequential steps:
+
+• **YouTube Comments**: "Write a comment saying I love this video"
+• **Amazon Reviews**: "Post a review saying great product"
+• **LinkedIn Posts**: "Create a post about my day"
+• **Reddit Comments**: "Comment on this thread"
+• **Form Filling**: Fill login forms, contact forms, surveys
+• **Element Actions**: Click buttons, type text, navigate pages
+
+Just describe what you want to do in natural language!
+
+**Example commands:**
+- "Write a YouTube comment saying this is amazing"
+- "Post an Amazon review saying excellent quality"
+- "Fill this form with test data"
+- "Click the login button and then type my email"`
+			);
+		}
+	} catch (e) {
+		console.error("loadHistory error:", e);
+	}
+}
+
+async function saveHistory() {
+	try {
+		await chrome.storage.local.set({ [STORAGE_KEY]: chatHistory });
+	} catch (e) {
+		console.error("saveHistory error:", e);
+	}
+}
+
+function renderHistoryUI(messages) {
+	els.chat.innerHTML = "";
+	for (const m of messages) {
+		const uiRole =
+			m.role === "user" ? "user" : m.role === "system" ? "system" : "bot";
+		const text = m.parts?.[0]?.text || "";
+		addMessageToUI(uiRole, text, false);
+	}
+}
 
 // Available functions for Gemini to call
 const AVAILABLE_FUNCTIONS = [
@@ -370,10 +429,8 @@ async function executeWorkflow(workflowType, textContent, customSteps) {
 
 		// Execute steps sequentially
 		const results = [];
-
 		for (let i = 0; i < steps.length; i++) {
 			const step = steps[i];
-
 			try {
 				console.log(
 					`Executing step ${i + 1}/${steps.length}: ${
@@ -440,7 +497,6 @@ async function executeWorkflow(workflowType, textContent, customSteps) {
 								} else if (stepData.action === "type") {
 									// Type into active element or contenteditable
 									const active = document.activeElement;
-
 									if (active && active.isContentEditable) {
 										active.focus();
 										document.execCommand(
@@ -483,7 +539,6 @@ async function executeWorkflow(workflowType, textContent, customSteps) {
 											);
 										const targetInput =
 											textInputs[textInputs.length - 1]; // Usually the last one is the active one
-
 										if (targetInput) {
 											targetInput.focus();
 											if (targetInput.isContentEditable) {
@@ -574,17 +629,14 @@ async function fillFormCurrentPage(formData, submitForm) {
 						bubbles: true,
 						cancelable: true,
 					});
-
 					const changeEvent = new Event("change", {
 						bubbles: true,
 						cancelable: true,
 					});
-
 					const keydownEvent = new KeyboardEvent("keydown", {
 						bubbles: true,
 						cancelable: true,
 					});
-
 					const keyupEvent = new KeyboardEvent("keyup", {
 						bubbles: true,
 						cancelable: true,
@@ -600,6 +652,7 @@ async function fillFormCurrentPage(formData, submitForm) {
 
 				function findElement(selector) {
 					let elements = [];
+
 					try {
 						elements = document.querySelectorAll(selector);
 						if (elements.length > 0) return elements[0];
@@ -635,6 +688,7 @@ async function fillFormCurrentPage(formData, submitForm) {
 								const input = document.getElementById(forId);
 								if (input) return input;
 							}
+
 							const nestedInput = label.querySelector(
 								"input, select, textarea"
 							);
@@ -897,32 +951,25 @@ async function typeText(selector, text, clearFirst) {
 
 				function typeIntoContentEditable(element, text) {
 					element.focus();
-
 					if (clear) {
 						element.innerHTML = "";
 					}
-
 					document.execCommand("insertText", false, text);
-
 					element.dispatchEvent(
 						new Event("input", { bubbles: true })
 					);
 					element.dispatchEvent(
 						new Event("change", { bubbles: true })
 					);
-
 					return `Inserted "${text}" into contenteditable element`;
 				}
 
 				function typeIntoInput(element, text) {
 					element.focus();
-
 					if (clear) {
 						element.value = "";
 					}
-
 					element.value += text;
-
 					["input", "change", "blur", "keydown", "keyup"].forEach(
 						(eventType) => {
 							element.dispatchEvent(
@@ -930,7 +977,6 @@ async function typeText(selector, text, clearFirst) {
 							);
 						}
 					);
-
 					return `Typed "${text}" into input element`;
 				}
 
@@ -939,15 +985,12 @@ async function typeText(selector, text, clearFirst) {
 				if (!element) {
 					element = document.querySelector(`[name="${sel}"]`);
 				}
-
 				if (!element) {
 					element = document.getElementById(sel);
 				}
-
 				if (!element) {
 					element = document.querySelector(`[placeholder*="${sel}"]`);
 				}
-
 				if (!element) {
 					element = document.activeElement;
 					if (!element || element.tagName === "BODY") {
@@ -1074,35 +1117,30 @@ async function executeFunctionCall(functionCall) {
 				args.text_content,
 				args.custom_steps
 			);
-
 		case "fill_form_current_page":
 			return await fillFormCurrentPage(args.form_data, args.submit_form);
-
 		case "open_website_or_search":
 			return await openWebsiteOrSearch(
 				args.query,
 				args.action_type,
 				args.new_tab
 			);
-
 		case "click_element":
 			return await clickElement(args.selector, args.wait_after);
-
 		case "type_text":
 			return await typeText(args.selector, args.text, args.clear_first);
-
 		case "type_into_active_element":
 			return await typeIntoActiveElement(args.text);
-
 		default:
 			return { success: false, error: `Unknown function: ${name}` };
 	}
 }
 
 // UI Functions
-function addMessage(role, text, isCode = false) {
+function addMessageToUI(role, text, isCode = false) {
 	const wrap = document.createElement("div");
 	wrap.className = `msg ${role}`;
+
 	const bubble = document.createElement("div");
 	bubble.className = "bubble";
 
@@ -1115,12 +1153,30 @@ function addMessage(role, text, isCode = false) {
 	wrap.appendChild(bubble);
 	els.chat.appendChild(wrap);
 	els.chat.scrollTop = els.chat.scrollHeight;
+}
 
-	if (role === "user" || role === "bot") {
-		chatHistory.push({
-			role: role === "user" ? "user" : "model",
-			parts: [{ text: text }],
-		});
+function addMessage(role, text, isCode = false) {
+	// Add to UI
+	addMessageToUI(role, text, isCode);
+
+	// Normalize role for storage (Gemini format)
+	const storedRole =
+		role === "user" ? "user" : role === "bot" ? "model" : "system";
+	const entry = { role: storedRole, parts: [{ text }] };
+
+	// Skip verbose system messages to save storage space
+	const shouldPersist = !(storedRole === "system" && isCode === true);
+
+	if (shouldPersist) {
+		chatHistory.push(entry);
+
+		// Keep last 500 messages to prevent unlimited growth
+		if (chatHistory.length > 500) {
+			chatHistory = chatHistory.slice(-500);
+		}
+
+		// Save to persistent storage
+		saveHistory();
 	}
 }
 
@@ -1133,7 +1189,6 @@ function setLoading(isLoading) {
 // Enhanced Chat Payload with COMPLETE Page Content
 async function buildChatPayloadWithPage(userText) {
 	const pageContent = await getCurrentPageContent();
-
 	let enhancedUserText = userText;
 
 	if (pageContent) {
@@ -1195,14 +1250,14 @@ CAPABILITIES:
    - custom_workflow: Execute custom sequence of steps
 
 2. **Form Filling** - Fill any form using real field selectors and names
-3. **Element Clicking** - Click buttons, links, or any clickable elements  
+3. **Element Clicking** - Click buttons, links, or any clickable elements
 4. **Text Input** - Type into any input fields or contenteditable elements
 5. **Page Navigation** - Open websites, search Google/YouTube
 6. **Complete Page Context** - Full access to page HTML, forms, buttons, content
 
 AUTOMATION APPROACH:
 - For multi-step actions (comment, review, post), use execute_workflow
-- Use single functions (click_element, type_text) for individual actions  
+- Use single functions (click_element, type_text) for individual actions
 - Parse complex commands into appropriate workflows
 - Use actual element selectors from the page content provided
 - Work with the user's current browser session and login state
@@ -1216,7 +1271,7 @@ BEHAVIOR:
 
 EXAMPLES:
 - "Write a comment saying I like this video" → youtube_comment workflow
-- "Post a review saying great product" → amazon_review workflow  
+- "Post a review saying great product" → amazon_review workflow
 - "Comment on this Reddit post" → reddit_comment workflow
 - "Fill this login form" → Use form filling for individual action
 - "Click submit button" → Use click_element for single action
@@ -1237,6 +1292,7 @@ async function callGeminiChat(userText) {
 	const url = `${BASE_URL}/${MODEL_ID}:generateContent?key=${encodeURIComponent(
 		GEMINI_API_KEY
 	)}`;
+
 	const payload = await buildChatPayloadWithPage(userText);
 
 	const res = await fetch(url, {
@@ -1268,6 +1324,7 @@ async function callGeminiChat(userText) {
 	if (functionCalls.length > 0) {
 		for (const part of functionCalls) {
 			const functionCall = part.functionCall;
+
 			addMessage("system", `🔧 Executing: ${functionCall.name}`, true);
 
 			const result = await executeFunctionCall({
@@ -1306,17 +1363,18 @@ async function callGeminiChat(userText) {
 }
 
 // Clear chat history function
-function clearChat() {
+async function clearChat() {
 	chatHistory = [];
 	els.chat.innerHTML = "";
+	await chrome.storage.local.remove(STORAGE_KEY);
 	addMessage(
 		"bot",
 		`🤖 **Multi-Step Automation Assistant Ready!**
 
 I can help you with:
-• **Sequential Workflows**: "Write a comment saying I like this video" 
-• **Form Filling**: "Fill this login form with my details"
-• **Element Actions**: "Click the submit button"  
+• **Sequential Workflows**: "Write a comment saying I like this video"
+• **Form Filling**: "Fill this login form with my details"  
+• **Element Actions**: "Click the submit button"
 • **Text Input**: "Type a comment on this video"
 • **Navigation**: "Open YouTube and search for music"
 
@@ -1347,6 +1405,7 @@ async function sendMessage() {
 }
 
 els.send.addEventListener("click", sendMessage);
+
 els.prompt.addEventListener("keydown", (e) => {
 	if (e.key === "Enter" && !e.shiftKey) {
 		e.preventDefault();
@@ -1354,24 +1413,8 @@ els.prompt.addEventListener("keydown", (e) => {
 	}
 });
 
-// Initialize
-addMessage(
-	"bot",
-	`🤖 **Multi-Step Automation Assistant Ready!**
+// Initialize - Load chat history when popup opens
+document.addEventListener("DOMContentLoaded", loadHistory);
 
-I can automate complex workflows with sequential steps:
-• **YouTube Comments**: "Write a comment saying I love this video"
-• **Amazon Reviews**: "Post a review saying great product" 
-• **LinkedIn Posts**: "Create a post about my day"
-• **Reddit Comments**: "Comment on this thread"
-• **Form Filling**: Fill login forms, contact forms, surveys
-• **Element Actions**: Click buttons, type text, navigate pages
-
-Just describe what you want to do in natural language!
-
-**Example commands:**
-- "Write a YouTube comment saying this is amazing"
-- "Post an Amazon review saying excellent quality"
-- "Fill this form with test data"
-- "Click the login button and then type my email"`
-);
+// Add clear button functionality (if you have a clear button in HTML)
+document.getElementById("clear")?.addEventListener("click", clearChat);
