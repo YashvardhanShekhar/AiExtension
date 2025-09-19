@@ -86,6 +86,25 @@
       border-top-color:var(--accent); animation:spin 1s linear infinite; position:absolute; right:10px; top:10px;
       display:none;
     }
+    #button-area {
+            display: flex;
+            gap: 5px;
+            justify-content: space-between;
+        }
+        
+        #clear {
+            padding: 6px 12px;
+            background: #dc3545;
+            color: white;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+            font-size: 12px;
+        }
+        
+        #clear:hover {
+            background: #c82333;
+        }
     @keyframes spin{ to{ transform:rotate(360deg) } }
     .hint{
       text-align:center; color:var(--muted); font-size:12px; padding:10px 12px;
@@ -99,6 +118,9 @@
       <div class="logo"></div>
       <div class="title">Gemini Chat</div>
       <div class="badge">2.5 Flash</div>
+       <div id="button-area">
+        <button id="clear">🗑️</button>
+    </div>
     </div>
 
     <div id="chat" class="chat"></div>

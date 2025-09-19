@@ -1,10 +1,11 @@
 // popup.js - Complete Native Chrome Extension Automation Assistant with Multi-Step Workflows and Persistent Chat History
-const GEMINI_API_KEY = "YOUR_GEMINI_API_KEY";
+const GEMINI_API_KEY = "AIzaSyCU3fraYxa-1umgQeDWHyzfS-_FlaElimI";
 const MODEL_ID = "models/gemini-2.5-flash";
 const BASE_URL = "https://generativelanguage.googleapis.com/v1beta";
 
 // Storage key for persistent chat history
 const STORAGE_KEY = "chatHistory_v1";
+
 
 // Chat history to maintain conversation context
 let chatHistory = [];
@@ -230,6 +231,21 @@ const AVAILABLE_FUNCTIONS = [
 			required: ["text"],
 		},
 	},
+	    {
+        name: "execute_natural_command",
+        description: "Parse and execute natural language commands like 'open leetcode 2007 question', 'search youtube for tutorials', or 'open github.com'",
+        parameters: {
+            type: "object",
+            properties: {
+                command: {
+                    type: "string",
+                    description: "The natural language command to parse and execute"
+                }
+            },
+            required: ["command"]
+        }
+    },
+
 ];
 
 // Page Content Extraction Functions
@@ -315,6 +331,84 @@ function extractPageContent() {
 
 	return content;
 }
+
+// Natural Language Command Parsing Functions
+// Simplest solution: Use LCid redirect service
+function parseNaturalCommand(userInput) {
+    const text = userInput.toLowerCase().trim();
+    
+    // Pattern: "open leetcode 2007 question/problem"
+    const leetcodeMatch = text.match(/open\s+leetcode\s+(.+?)(?:\s+(question|problem|page))?$/i);
+    if (leetcodeMatch) {
+        let identifier = leetcodeMatch[1].trim();
+        
+        // If it's a pure number, use LCid service
+        if (/^\d{1,5}$/.test(identifier)) {
+            return {
+                type: 'navigation',
+                action: 'direct_url',
+                url: `https://lcid.cc/${identifier}`, // This redirects to the correct LeetCode problem
+                description: `Opening LeetCode problem ${identifier}`
+            };
+        }
+        
+        // If it contains a number followed by words, extract the number first
+        const idMatch = identifier.match(/^(\d{1,5})/);
+        if (idMatch) {
+            return {
+                type: 'navigation',
+                action: 'direct_url',
+                url: `https://lcid.cc/${idMatch[1]}`,
+                description: `Opening LeetCode problem ${idMatch[1]}`
+            };
+        }
+        
+        // Otherwise, treat as slug
+        const slug = identifier.replace(/\s+/g, '-').replace(/[^a-z0-9-]/g, '');
+        return {
+            type: 'navigation',
+            action: 'direct_url',
+            url: `https://leetcode.com/problems/${slug}/`,
+            description: `Opening LeetCode problem: ${slug}`
+        };
+    }
+    
+    // ... rest of your existing code
+    return null;
+}
+
+
+async function executeNaturalCommand(command) {
+    try {
+        const parsedCommand = parseNaturalCommand(command);
+        
+        if (!parsedCommand) {
+            // Fallback to Google search
+            return await openWebsiteOrSearch(command, 'google_search', true);
+        }
+        
+        switch (parsedCommand.type) {
+            case 'navigation':
+                if (parsedCommand.action === 'direct_url') {
+                    return await openWebsiteOrSearch(parsedCommand.url, 'direct_url', true);
+                } else {
+                    return await openWebsiteOrSearch(parsedCommand.query, parsedCommand.action, true);
+                }
+            
+            default:
+                return {
+                    success: false,
+                    error: `Unknown command type: ${parsedCommand.type}`
+                };
+        }
+    } catch (error) {
+        return {
+            success: false,
+            error: `Command execution failed: ${error.message}`
+        };
+    }
+}
+
 
 // Multi-Step Workflow Execution
 async function executeWorkflow(workflowType, textContent, customSteps) {
@@ -1131,6 +1225,9 @@ async function executeFunctionCall(functionCall) {
 			return await typeText(args.selector, args.text, args.clear_first);
 		case "type_into_active_element":
 			return await typeIntoActiveElement(args.text);
+		        case "execute_natural_command":
+            return await executeNaturalCommand(args.command);
+
 		default:
 			return { success: false, error: `Unknown function: ${name}` };
 	}
@@ -1159,15 +1256,12 @@ function addMessage(role, text, isCode = false) {
 	// Add to UI
 	addMessageToUI(role, text, isCode);
 
-	// Normalize role for storage (Gemini format)
-	const storedRole =
-		role === "user" ? "user" : role === "bot" ? "model" : "system";
-	const entry = { role: storedRole, parts: [{ text }] };
+	// Only store user and bot messages in chatHistory for Gemini API
+	// System messages are just UI feedback and shouldn't be part of conversation context
+	if (role === "user" || role === "bot") {
+		const storedRole = role === "user" ? "user" : "model";
+		const entry = { role: storedRole, parts: [{ text }] };
 
-	// Skip verbose system messages to save storage space
-	const shouldPersist = !(storedRole === "system" && isCode === true);
-
-	if (shouldPersist) {
 		chatHistory.push(entry);
 
 		// Keep last 500 messages to prevent unlimited growth
@@ -1236,10 +1330,10 @@ ${JSON.stringify(pageContent.meta, null, 2)}
 				function_declarations: AVAILABLE_FUNCTIONS,
 			},
 		],
-		systemInstruction: {
-			parts: [
-				{
-					text: `You are an intelligent Chrome extension automation assistant with COMPLETE access to the current webpage content and multi-step workflow capabilities.
+		        systemInstruction: {
+            parts: [
+                {
+                    text: `You are an intelligent Chrome extension automation assistant with COMPLETE access to the current webpage content and multi-step workflow capabilities.
 
 CAPABILITIES:
 1. **Multi-Step Workflows** - Execute complete sequences like commenting, reviewing, posting:
@@ -1253,33 +1347,37 @@ CAPABILITIES:
 3. **Element Clicking** - Click buttons, links, or any clickable elements
 4. **Text Input** - Type into any input fields or contenteditable elements
 5. **Page Navigation** - Open websites, search Google/YouTube
-6. **Complete Page Context** - Full access to page HTML, forms, buttons, content
+6. **Natural Language Commands** - Parse commands like "open leetcode 2007 question", "search youtube for tutorials"
+7. **Complete Page Context** - Full access to page HTML, forms, buttons, content
+
+NATURAL COMMAND EXAMPLES:
+- "open leetcode 2007 question" → Opens LeetCode problem 2007 directly
+- "open leetcode find original array" → Opens that specific problem
+- "search youtube for react tutorials" → Searches YouTube
+- "google search javascript arrays" → Performs Google search
+- "open github.com" → Opens GitHub directly
 
 AUTOMATION APPROACH:
 - For multi-step actions (comment, review, post), use execute_workflow
+- For navigation commands, use execute_natural_command to parse and execute
 - Use single functions (click_element, type_text) for individual actions
-- Parse complex commands into appropriate workflows
+- Parse complex commands into appropriate workflows or navigation actions
 - Use actual element selectors from the page content provided
 - Work with the user's current browser session and login state
 
 BEHAVIOR:
 - When users want to perform multi-step actions, automatically choose the right workflow
+- When users want to navigate or search, use execute_natural_command
 - Execute steps sequentially with proper timing
 - Use actual element names, IDs, and selectors from the page
 - Remember conversation history and page context
 - Provide clear feedback on what steps are being executed
 
-EXAMPLES:
-- "Write a comment saying I like this video" → youtube_comment workflow
-- "Post a review saying great product" → amazon_review workflow
-- "Comment on this Reddit post" → reddit_comment workflow
-- "Fill this login form" → Use form filling for individual action
-- "Click submit button" → Use click_element for single action
+You have complete native browser automation with natural language command parsing capabilities.`,
+                },
+            ],
+        },
 
-You have complete native browser automation with sequential workflow capabilities.`,
-				},
-			],
-		},
 	};
 }
 
@@ -1418,3 +1516,53 @@ document.addEventListener("DOMContentLoaded", loadHistory);
 
 // Add clear button functionality (if you have a clear button in HTML)
 document.getElementById("clear")?.addEventListener("click", clearChat);
+// Add this at the end of popup.js, after the existing event listeners
+
+// Clear/Reset chat button event listener
+document.getElementById("clear").addEventListener("click", async () => {
+    // Show confirmation dialog
+    if (confirm("Are you sure you want to clear all chat history? This cannot be undone.")) {
+        await clearChat();
+    }
+});
+// Event Handlers
+async function sendMessage() {
+    const prompt = els.prompt.value.trim();
+    if (!prompt) return;
+
+    addMessage("user", prompt);
+    els.prompt.value = "";
+    setLoading(true);
+
+    try {
+        const reply = await callGeminiChat(prompt);
+        if (reply.trim()) {
+            addMessage("bot", reply);
+        }
+    } catch (err) {
+        console.error(err);
+        addMessage("bot", "❌ Error: " + (err?.message || "Request failed"));
+    } finally {
+        setLoading(false);
+    }
+}
+
+els.send.addEventListener("click", sendMessage);
+
+els.prompt.addEventListener("keydown", (e) => {
+    if (e.key === "Enter" && !e.shiftKey) {
+        e.preventDefault();
+        sendMessage();
+    }
+});
+
+// Initialize - Load chat history when popup opens
+document.addEventListener("DOMContentLoaded", loadHistory);
+
+// Clear/Reset chat button event listener
+document.getElementById("clear").addEventListener("click", async () => {
+    // Show confirmation dialog
+    if (confirm("Are you sure you want to clear all chat history? This cannot be undone.")) {
+        await clearChat();
+    }
+});
