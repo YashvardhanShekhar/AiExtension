@@ -1,5 +1,5 @@
 // popup.js - Complete Native Chrome Extension Automation Assistant with Multi-Step Workflows and Persistent Chat History
-const GEMINI_API_KEY = "AIzaSyCU3fraYxa-1umgQeDWHyzfS-_FlaElimI";
+const GEMINI_API_KEY = "YOUR_GEMINI_API_KEY";
 const MODEL_ID = "models/gemini-2.5-flash";
 const BASE_URL = "https://generativelanguage.googleapis.com/v1beta";
 
